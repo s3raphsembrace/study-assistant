@@ -116,7 +116,7 @@ public class GenerationPipeline {
 			}
 			case AUDIO -> {
 				String text = spokenText(documentId, jobId);
-				String voice = request.voice();
+				String voice = request.voice() != null && !request.voice().isBlank() ? request.voice() : tts.defaultVoice();
 				double speed = request.speed() != null ? request.speed() : 1.0;
 				jobs.progress(jobId, "audio", 0.3, "Synthesizing speech…");
 				Path out = app.audioDir().resolve("notes-" + documentId + ".wav");
@@ -130,7 +130,7 @@ public class GenerationPipeline {
 				}
 				yield json.writeValueAsString(Map.of(
 						"path", r.file().toString(),
-						"voice", voice != null ? voice : "",
+						"voice", voice,
 						"speed", speed,
 						"sampleRate", r.sampleRate(),
 						"bytes", r.bytes(),

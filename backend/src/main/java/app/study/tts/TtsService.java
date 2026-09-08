@@ -78,6 +78,10 @@ public class TtsService {
 		if (s != null) s.stop();
 	}
 
+	public String defaultVoice() {
+		return props.defaultVoice();
+	}
+
 	public Status status() {
 		boolean py = pythonFound();
 		boolean kk = py && kokoroInstalled();
