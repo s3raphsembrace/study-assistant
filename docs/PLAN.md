@@ -88,20 +88,26 @@ Notes are stored as Markdown and rendered in Angular (marked + KaTeX for math).
 
 ## 5. Phases
 
-0. **Scaffold**: Angular app, Spring app, proxy config, `/api/health`,
+Status as of 2026-09-08.
+
+0. **Scaffold** — done. Angular app, Spring app, proxy config, `/api/health`,
    `.gitignore`, one-jar build that embeds the frontend.
-1. **PDF in, text out**: drag-drop, PDFBox extraction, job + SSE progress,
-   raw text/page view. *Milestone: drop a lecture, see its text.*
-2. **Generation**: Ollama client, chunker, notes map/reduce, key terms,
-   flashcards, quiz; persistence; document library UI.
-3. **TTS**: Web Speech reader with sentence highlighting; then Kokoro
-   sidecar + audio export.
-4. **Audio/video sources**: drop mp3/mp4/wav or paste a YouTube URL;
+1. **PDF in, text out** — done. Drag-drop, PDFBox extraction (both sort modes,
+   per-page pick by garble score), header/footer/page-number/hyphenation
+   cleanup, per-page sentence de-duplication for double-layer PDFs, job + SSE
+   progress, page/full-text view.
+2. **Generation** — done. Hand-rolled Ollama client (streaming, JSON-schema
+   structured output, repeat penalty, output caps), chunker, notes
+   map/reduce with a frame pass for long documents, key terms, flashcards,
+   self-grading quiz, references stripped from source, model picker.
+3. **TTS** — done, Kokoro untested pending the 27 MB voices file. Web Speech
+   reader with sentence highlighting, speed and voice; "spoken version" pass;
+   Kokoro sidecar + WAV export with in-app model download.
+4. **Audio/video sources** — next. Drop mp3/mp4/wav or paste a YouTube URL;
    yt-dlp captions first, whisper.cpp fallback (needs ffmpeg + a ggml model).
 5. **Chat with the material**: embeddings via `nomic-embed-text`, cosine
    search in Java over stored chunk vectors, grounded answers.
-6. **Packaging**: launcher that opens the browser; optional Electron/Tauri
-   shell; OCR toggle; model picker in settings.
+6. **Packaging**: optional Electron/Tauri shell; OCR toggle; settings page.
 
 ## 6. Concerns and decisions needed
 

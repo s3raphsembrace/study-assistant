@@ -2,4 +2,4 @@ You are given study notes for a long document. Write two things in GitHub-flavor
 1. One short overview paragraph (3-5 sentences) saying what the whole document covers.
 2. A "## Key Takeaways" list of the 6-10 most important points across the whole document.
 
-Output exactly: the overview paragraph, a blank line, then the Key Takeaways section. Nothing else.
+Output exactly: the overview paragraph (plain prose, no heading above it), a blank line, then the "## Key Takeaways" section. Nothing else.

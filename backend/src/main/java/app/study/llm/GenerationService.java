@@ -72,7 +72,7 @@ public class GenerationService {
 				 {"type":"object","required":["type","topic","question","options","correctIndex","explanation"],
 				  "properties":{"type":{"type":"string","enum":["mcq","true_false","fill_blank"]},
 				   "topic":{"type":"string"},"question":{"type":"string"},
-				   "options":{"type":"array","items":{"type":"string"}},
+				   "options":{"type":"array","items":{"type":"string"},"minItems":2,"maxItems":4},
 				   "correctIndex":{"type":"integer"},"explanation":{"type":"string"}}}}}}
 				""");
 	}
@@ -220,6 +220,7 @@ public class GenerationService {
 					throw new LlmException(LlmException.Kind.BAD_RESPONSE,
 							"The model returned no " + arrayField + ".");
 				}
+				if ("questions".equals(arrayField)) tidyQuiz(arr);
 				return json.writeValueAsString(node);
 			} catch (JacksonException e) {
 				last = new LlmException(LlmException.Kind.BAD_RESPONSE,
@@ -232,6 +233,42 @@ public class GenerationService {
 					+ arrayField + "\" array.";
 		}
 		throw last;
+	}
+
+	private static final java.util.regex.Pattern OPTION_LINE = java.util.regex.Pattern.compile(
+			"(?m)^\\s*\\(?([A-Da-d])[).:]\\s*(.+?)\\s*$");
+	private static final java.util.regex.Pattern BARE_LETTER = java.util.regex.Pattern.compile("^\\(?[A-Da-d][).]?$");
+
+	/**
+	 * Small models like to restate the answer choices inside the question text
+	 * ("...?\nA) ...\nB) ...", sometimes with a literal backslash-n) and then
+	 * fill the options array with bare letters. Recover the real options from
+	 * those lines when needed, and always drop them from the question.
+	 */
+	static void tidyQuiz(JsonNode questions) {
+		for (JsonNode q : questions) {
+			if (!(q instanceof tools.jackson.databind.node.ObjectNode obj)) continue;
+			String text = obj.path("question").asText("").replace("\\n", "\n");
+			if (!"mcq".equals(obj.path("type").asText())) {
+				obj.put("question", text.strip());
+				continue;
+			}
+
+			List<String> parsed = new ArrayList<>();
+			var m = OPTION_LINE.matcher(text);
+			while (m.find()) parsed.add(m.group(2).strip());
+
+			JsonNode opts = obj.path("options");
+			boolean lettersOnly = opts.isArray() && !opts.isEmpty();
+			for (JsonNode o : opts) lettersOnly &= BARE_LETTER.matcher(o.asText("").strip()).matches();
+			if (parsed.size() >= 2 && (lettersOnly || opts.size() != parsed.size())) {
+				var arr = obj.putArray("options");
+				parsed.forEach(arr::add);
+			}
+
+			String cleaned = OPTION_LINE.matcher(text).replaceAll("").replaceAll("\\n{2,}", "\n").strip();
+			obj.put("question", cleaned.isEmpty() ? text.strip() : cleaned);
+		}
 	}
 
 	private JsonNode schema(String s) {

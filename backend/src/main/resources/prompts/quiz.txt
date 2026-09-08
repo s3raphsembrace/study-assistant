@@ -1,5 +1,5 @@
 Create a {{count}}-question quiz from the material at {{difficulty}} difficulty. Use these question types: {{types}}.
-- mcq: exactly 4 plausible options, exactly one correct.
+- mcq: exactly 4 plausible options, exactly one correct. The options array holds the full text of each choice; the question field holds ONLY the question, never an A)/B)/C)/D) list.
 - true_false: options are exactly ["True", "False"].
 - fill_blank: write the question with a ___ blank; options holds the single exact answer and correctIndex is 0.
 - correctIndex is the 0-based index of the correct option.

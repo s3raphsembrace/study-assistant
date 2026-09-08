@@ -47,7 +47,10 @@ export function markdownToSpeech(md: string): string {
   t = t.replace(/\$([^$\n]+?)\$/g, (_, m) => ` ${latexToWords(m)} `);
   t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
   t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
-  t = t.replace(/^\s{0,3}#{1,6}\s*(.+?)\s*#*\s*$/gm, (_, h) => `\n\n${h.trim().replace(/[.:]$/, '')}.\n\n`);
+  // Bare "#" lines (a model hiccup) are dropped; real headings become short sentences.
+  // Only horizontal whitespace inside the pattern, so it can never span lines.
+  t = t.replace(/^[ \t]{0,3}#{1,6}[ \t]*$/gm, '');
+  t = t.replace(/^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm, (_, h) => `\n\n${h.trim().replace(/[.:]$/, '')}.\n\n`);
   t = t.replace(/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/gm, '');
   t = t.replace(/^\s*\|(.+)\|\s*$/gm, (_, row: string) =>
     row.split('|').map((c) => c.trim()).filter(Boolean).join(', ') + '.',
