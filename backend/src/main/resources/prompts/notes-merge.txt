@@ -1,0 +1,8 @@
+You are given study notes written separately for consecutive sections of one document. Merge them into a single coherent set of notes:
+- Open with one short overview paragraph of what the whole document covers.
+- Keep ALL substantive content. Remove duplicated headings and repeated points; keep a logical order.
+- Keep the Markdown formatting, LaTeX math, tables and bold key terms.
+- Finish with a "## Key Takeaways" list of the 5-8 most important points.
+- Do not truncate. Write in {{language}}.
+
+Output only the merged Markdown notes, with no preamble and no surrounding code fence.

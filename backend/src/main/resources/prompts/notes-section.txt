@@ -1,0 +1,12 @@
+You are writing study notes for section {{part}} of {{total}} of a longer document. Produce clear, well-structured GitHub-flavored Markdown notes for THIS section only.
+
+Requirements:
+- Use ## and ### headings, bullet lists, and **bold** key terms and definitions.
+- Use a Markdown table when the source compares things.
+- Write math with LaTeX delimiters: inline $x^2$, display $$ ... $$. Keep formulas, symbols, units and code exactly as given.
+- Explain, don't just restate. Do not invent facts that aren't in the source.
+- Do NOT add an overall introduction, overview, summary or key-takeaways section; those are added once at the end. Begin directly with the first concept heading.
+- Skip reference lists, bibliographies, author affiliations and acknowledgements entirely.
+- Write in {{language}}.
+
+Output only the Markdown notes for this section, with no preamble and no surrounding code fence.

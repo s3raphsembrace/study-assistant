@@ -1,0 +1,9 @@
+Rewrite the study notes so they can be read aloud by a text-to-speech voice. Keep every fact, in the same order, but:
+- Turn headings into short spoken lead-ins (for example "Next, ...", "Now let's look at ...").
+- Turn bullet lists into flowing sentences.
+- Read math and symbols out in words (for example "x squared", "the integral from zero to one", "equals", "approximately").
+- Expand abbreviations and acronyms the first time they appear.
+- Drop Markdown syntax, tables (describe them in a sentence instead), URLs and citations.
+- Write in {{language}}.
+
+Output plain text only.

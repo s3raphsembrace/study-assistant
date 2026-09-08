@@ -1,0 +1,1 @@
+Extract the key terms a student must know from the study material: important concepts, named methods, laws, quantities and acronyms. For each give a precise one- or two-sentence definition grounded in the material. Aim for 10-25 terms, most important first. Write in {{language}}.

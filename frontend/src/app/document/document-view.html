@@ -1,0 +1,244 @@
+<nav class="crumbs"><a routerLink="/">← Library</a></nav>
+
+@if (error(); as msg) {
+  <p class="error" role="alert">{{ msg }}</p>
+}
+
+@if (doc(); as d) {
+  <header class="head">
+    <h2>{{ d.title }}</h2>
+    <p class="meta">
+      <span class="badge" [class]="'badge ' + d.status.toLowerCase()">{{ d.status }}</span>
+      {{ d.filename }}
+      @if (d.pageCount) { · {{ d.pageCount }} pages }
+      @if (d.charCount) { · {{ d.charCount | number }} characters }
+    </p>
+    @if (d.status === 'ERROR' && d.error) {
+      <p class="error" role="alert">{{ d.error }}</p>
+    }
+    @if (d.status === 'QUEUED' || d.status === 'EXTRACTING') {
+      <p class="working">Extracting text… this page will update when it's done.</p>
+    }
+  </header>
+
+  @if (d.status === 'READY') {
+    <div class="tabs" role="tablist">
+      @for (t of tabs; track t.id) {
+        <button type="button" role="tab" [attr.aria-selected]="tab() === t.id" [class.active]="tab() === t.id" (click)="setTab(t.id)">
+          {{ t.label }}
+          @if (tabKind(t.id); as k) {
+            @if (jobs()[k]) {
+              <span class="spinner" aria-label="generating"></span>
+            }
+          }
+        </button>
+      }
+    </div>
+
+    @if (tab() === 'listen') {
+      @if (artifacts()['NOTES']?.status !== 'READY') {
+        <div class="gen">
+          <p class="hint">Listening needs the notes first. Generate them on the Notes tab.</p>
+        </div>
+      } @else {
+        <div class="mode-switch" role="tablist" aria-label="Voice">
+          <button type="button" role="tab" [class.active]="listenMode() === 'browser'" [attr.aria-selected]="listenMode() === 'browser'" (click)="setListenMode('browser')">Browser voice</button>
+          <button type="button" role="tab" [class.active]="listenMode() === 'kokoro'" [attr.aria-selected]="listenMode() === 'kokoro'" (click)="setListenMode('kokoro')">Natural voice (Kokoro)</button>
+        </div>
+
+        @if (listenMode() === 'kokoro') {
+          @if (tts(); as t) {
+            @if (!t.ready) {
+              <div class="gen">
+                <p class="hint">{{ t.problem }}</p>
+                @if (t.pythonFound && t.kokoroInstalled && (!t.modelPresent || !t.voicesPresent)) {
+                  @if (ttsSetupJob(); as sj) {
+                    <p class="working">{{ sj.status === 'ERROR' ? sj.error : sj.message }}</p>
+                    <progress [value]="sj.progress" max="1"></progress>
+                    @if (sj.status === 'ERROR') {
+                      <button type="button" class="primary" (click)="setupTts()">Try again</button>
+                    }
+                  } @else {
+                    <button type="button" class="primary" (click)="setupTts()">
+                      Download voice model ({{ t.modelPresent ? '27 MB' : '340 MB' }})
+                    </button>
+                    <p class="hint">Fetched once from the kokoro-onnx GitHub releases into tools/kokoro. Everything after that stays offline.</p>
+                  }
+                } @else {
+                  <button type="button" class="ghost" (click)="refreshTts()">Check again</button>
+                }
+              </div>
+            } @else {
+              <div class="artifact-bar">
+                @switch (audioState()?.status) {
+                  @case ('GENERATING') {
+                    <span class="hint">{{ audioJob()?.message ?? 'Starting…' }}</span>
+                    <progress [value]="audioJob()?.progress ?? 0" max="1"></progress>
+                  }
+                  @case ('ERROR') {
+                    <span class="error">{{ audioState()?.error }}</span>
+                    <button type="button" class="ghost" (click)="generateAudio()">Try again</button>
+                  }
+                  @case ('READY') {
+                    <span class="hint">
+                      @if (audioInfo(); as ai) {
+                        {{ formatDuration(ai.seconds) }} · voice {{ ai.voice || 'default' }} ·
+                      }
+                      generated {{ audioState()?.createdAt | date: 'MMM d, h:mm a' }}
+                    </span>
+                    <span class="voice-pick">
+                      <select (change)="audioVoice.set($any($event.target).value)">
+                        @for (v of t.voices; track v) {
+                          <option [value]="v" [selected]="v === audioVoice()">{{ v }}</option>
+                        }
+                      </select>
+                      <button type="button" class="ghost" (click)="generateAudio()">Regenerate</button>
+                    </span>
+                  }
+                  @default {
+                    <span class="hint">Turn the notes into an audio file you can play here or download.</span>
+                    <span class="voice-pick">
+                      @if (t.voices.length) {
+                        <select (change)="audioVoice.set($any($event.target).value)">
+                          @for (v of t.voices; track v) {
+                            <option [value]="v" [selected]="v === audioVoice()">{{ v }}</option>
+                          }
+                        </select>
+                      }
+                      <button type="button" class="primary" (click)="generateAudio()">Generate audio</button>
+                    </span>
+                  }
+                }
+              </div>
+              @if (audioState()?.status === 'READY') {
+                <audio class="player" controls preload="metadata" [src]="audioSrc()"></audio>
+                <p class="hint"><a [href]="audioSrc()" download>Download WAV</a> to listen on another device.</p>
+              }
+              @if (audioState()?.status === 'GENERATING') {
+                <p class="hint">The first run also writes the spoken version of the notes. Long notes take a few minutes.</p>
+              }
+            }
+          } @else {
+            <p class="working">Checking text-to-speech setup…</p>
+          }
+        } @else {
+        <div class="artifact-bar">
+          @switch (spokenState()?.status) {
+            @case ('READY') {
+              <span class="hint">Reading the spoken version (math and abbreviations expanded).</span>
+              <button type="button" class="ghost" (click)="generate('SPOKEN')">Regenerate spoken version</button>
+            }
+            @case ('GENERATING') {
+              <span class="hint">{{ spokenJob()?.message ?? 'Preparing spoken version…' }} Reading the plain notes meanwhile.</span>
+              <progress [value]="spokenJob()?.progress ?? 0" max="1"></progress>
+            }
+            @case ('ERROR') {
+              <span class="error">{{ spokenState()?.error }}</span>
+              <button type="button" class="ghost" (click)="generate('SPOKEN')">Try again</button>
+            }
+            @default {
+              <span class="hint">Reading the notes as-is. A spoken version reads math and abbreviations out in words.</span>
+              <button type="button" class="ghost" (click)="generate('SPOKEN')">Prepare spoken version</button>
+            }
+          }
+        </div>
+        @if (listenText(); as text) {
+          <app-reader [text]="text" />
+        } @else {
+          <p class="working">Loading…</p>
+        }
+        }
+      }
+    } @else if (tab() === 'pages') {
+      <ol class="pages">
+        @for (p of pages(); track p.pageNumber) {
+          <li class="page">
+            <span class="page-num">{{ p.pageNumber }}</span>
+            @if (p.text) {
+              <pre class="page-text">{{ p.text }}</pre>
+            } @else {
+              <p class="page-empty">(no text on this page)</p>
+            }
+          </li>
+        }
+      </ol>
+    } @else if (currentKind(); as kind) {
+      @switch (currentState()?.status) {
+        @case ('GENERATING') {
+          <div class="gen">
+            <p class="working">{{ currentJob()?.message ?? 'Starting…' }}</p>
+            <progress [value]="currentJob()?.progress ?? 0" max="1"></progress>
+            <p class="hint">Runs locally on your machine; long documents take a few minutes.</p>
+          </div>
+        }
+        @case ('ERROR') {
+          <div class="gen">
+            <p class="error" role="alert">{{ currentState()?.error }}</p>
+            <button type="button" class="primary" (click)="generate(kind)">Try again</button>
+          </div>
+        }
+        @case ('READY') {
+          <div class="artifact-bar">
+            @if (currentJob(); as job) {
+              <span class="hint regen">
+                Regenerating: {{ job.message }}
+                <progress [value]="job.progress" max="1"></progress>
+              </span>
+            } @else {
+              <span class="hint">
+                Generated {{ currentState()?.createdAt | date: 'MMM d, h:mm a' }}
+                @if (currentState()?.model) { with {{ currentState()?.model }} }
+              </span>
+              <button type="button" class="ghost" (click)="generate(kind)">Regenerate</button>
+            }
+          </div>
+          @switch (kind) {
+            @case ('NOTES') {
+              @if (notes(); as md) {
+                <app-markdown class="notes" [source]="md" />
+              } @else {
+                <p class="working">Loading…</p>
+              }
+            }
+            @case ('KEY_TERMS') {
+              @if (terms(); as list) {
+                <dl class="terms">
+                  @for (t of list; track t.term) {
+                    <div class="term">
+                      <dt>{{ t.term }}</dt>
+                      <dd>{{ t.definition }}</dd>
+                    </div>
+                  }
+                </dl>
+              } @else {
+                <p class="working">Loading…</p>
+              }
+            }
+            @case ('FLASHCARDS') {
+              @if (cards(); as list) {
+                <app-flashcards [cards]="list" />
+              } @else {
+                <p class="working">Loading…</p>
+              }
+            }
+            @case ('QUIZ') {
+              @if (questions(); as list) {
+                <app-quiz [questions]="list" />
+              } @else {
+                <p class="working">Loading…</p>
+              }
+            }
+          }
+        }
+        @default {
+          <div class="gen">
+            <p class="hint">Nothing generated yet.</p>
+            <button type="button" class="primary" (click)="generate(kind)">Generate {{ kindLabel(kind) }}</button>
+          </div>
+        }
+      }
+    }
+  }
+} @else if (!error()) {
+  <p class="working">Loading…</p>
+}

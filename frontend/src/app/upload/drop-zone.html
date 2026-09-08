@@ -1,0 +1,16 @@
+<input
+  #picker
+  type="file"
+  multiple
+  hidden
+  [accept]="acceptAttr()"
+  (change)="onPicked($event)"
+  (click)="$event.stopPropagation()"
+/>
+<div class="inner">
+  <div class="icon" aria-hidden="true">⬇</div>
+  <p class="headline">
+    @if (dragging()) { Drop to upload } @else { Drop lecture PDFs here }
+  </p>
+  <p class="hint">or click to choose files · {{ accept().join(', ') }}</p>
+</div>

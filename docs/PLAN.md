@@ -4,16 +4,12 @@ A local-first study tool: drop lecture PDFs (later: audio/video), get notes,
 key terms, flashcards, and a quiz, then have the app read the notes aloud,
 with nothing leaving the machine.
 
-Reference implementation studied: NitroAI (React/Vite + a small Node server
-that shells out to yt-dlp and manages Ollama). We reuse its *design*, not its
-code (it is AGPL-3.0; see Concerns).
-
 ## 1. Stack
 
 | Layer | Choice | Why |
 | --- | --- | --- |
 | Frontend | Angular 21 (standalone components, signals) | Requested; `ng` 21.2 already installed |
-| Backend | Spring Boot 3.5 on Java 25 (Maven wrapper) | Requested; JDK 25 installed (see Concerns re: PATH) |
+| Backend | Spring Boot 4.1 on Java 25 (Maven wrapper) | Requested; JDK 25 installed (see Concerns re: PATH) |
 | PDF text | Apache PDFBox 3.x | Pure Java, no native deps, per-page extraction |
 | OCR (optional) | Tesseract via tess4j | Only for image-only slide decks; adds native DLLs |
 | LLM | Ollama over its local REST API (`/api/chat`, `/api/embeddings`) | Already installed with `qwen2.5:3b` + `nomic-embed-text` pulled |

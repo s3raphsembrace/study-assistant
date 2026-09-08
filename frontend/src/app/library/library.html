@@ -1,0 +1,47 @@
+<section class="upload">
+  <app-drop-zone [disabled]="uploading()" (files)="onFiles($event)" (rejected)="onRejected($event)" />
+
+  @if (error(); as msg) {
+    <p class="error" role="alert">{{ msg }}</p>
+  }
+
+  @for (job of activeJobs(); track job.id) {
+    <div class="job" [class.failed]="job.status === 'ERROR'">
+      <div class="job-head">
+        <span class="job-label">{{ job.label }}</span>
+        <span class="job-message">{{ job.status === 'ERROR' ? job.error : job.message }}</span>
+        @if (job.status === 'ERROR') {
+          <button type="button" class="dismiss" (click)="dismissJob(job.id)" aria-label="Dismiss">×</button>
+        }
+      </div>
+      <progress [value]="job.progress" max="1"></progress>
+    </div>
+  }
+</section>
+
+<section class="docs">
+  <h2>Library</h2>
+  @if (documents().length === 0) {
+    <p class="empty">Nothing here yet. Drop a lecture PDF above to get started.</p>
+  } @else {
+    <ul class="doc-list">
+      @for (doc of documents(); track doc.id) {
+        <li>
+          <a class="doc" [routerLink]="['/documents', doc.id]">
+            <span class="badge" [class]="'badge ' + doc.status.toLowerCase()">{{ doc.status }}</span>
+            <span class="doc-title">{{ doc.title }}</span>
+            <span class="doc-meta">
+              {{ doc.filename }}
+              @if (doc.pageCount) { · {{ doc.pageCount }} pages }
+              · {{ doc.createdAt | date: 'MMM d, h:mm a' }}
+            </span>
+            @if (doc.status === 'ERROR' && doc.error) {
+              <span class="doc-error">{{ doc.error }}</span>
+            }
+            <button type="button" class="delete" (click)="remove(doc, $event)" aria-label="Delete">Delete</button>
+          </a>
+        </li>
+      }
+    </ul>
+  }
+</section>

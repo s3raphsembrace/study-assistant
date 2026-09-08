@@ -1,0 +1,36 @@
+@if (!supported) {
+  <p class="error">This browser has no speech synthesis. Try Chrome, Edge or Safari.</p>
+} @else {
+  <div class="controls">
+    <button type="button" class="icon" (click)="skip(-1)" aria-label="Previous sentence" title="Previous sentence">⏮</button>
+    <button type="button" class="play" (click)="toggle()" [attr.aria-label]="state() === 'playing' ? 'Pause' : 'Play'">
+      {{ state() === 'playing' ? '⏸ Pause' : state() === 'paused' ? '▶ Resume' : '▶ Play' }}
+    </button>
+    <button type="button" class="icon" (click)="skip(1)" aria-label="Next sentence" title="Next sentence">⏭</button>
+    <button type="button" class="icon" (click)="restart()" aria-label="Restart" title="Restart from the top">↺</button>
+
+    <label class="rate">
+      Speed <strong>{{ rate() | number: '1.1-2' }}×</strong>
+      <input type="range" min="0.5" max="2" step="0.1" [value]="rate()" (input)="setRate($any($event.target).value)" />
+    </label>
+
+    <label class="voice">
+      Voice
+      <select (change)="setVoice($any($event.target).value)">
+        @for (v of voices(); track v.name) {
+          <option [value]="v.name" [selected]="v.name === voiceName()">
+            {{ v.name }} ({{ v.lang }}{{ v.local ? '' : ', online' }})
+          </option>
+        }
+      </select>
+    </label>
+
+    <span class="pos">{{ sentences().length ? index() + 1 : 0 }} / {{ sentences().length }}</span>
+  </div>
+
+  <div class="transcript" aria-live="off">
+    @for (s of sentences(); track $index; let i = $index) {
+      <span #sentence class="sentence" [class.current]="i === index() && state() !== 'idle'" [class.done]="i < index()" (click)="jumpTo(i)">{{ s }} </span>
+    }
+  </div>
+}

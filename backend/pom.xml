@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.1</version>
+		<relativePath/>
+	</parent>
+	<groupId>dev.kmatt</groupId>
+	<artifactId>backend</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>study-assistant-backend</name>
+	<description>Study Assistant backend: local PDF ingestion, Ollama generation, offline TTS</description>
+
+	<properties>
+		<java.version>25</java.version>
+		<!-- Angular project, relative to this pom. -->
+		<frontend.dir>${project.basedir}/../frontend</frontend.dir>
+		<frontend.dist>${frontend.dir}/dist/frontend/browser</frontend.dist>
+		<npm.executable>npm</npm.executable>
+		<sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
+		<pdfbox.version>3.0.7</pdfbox.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- Storage: a single SQLite file under data/. Dialect version is managed by Boot. -->
+		<dependency>
+			<groupId>org.xerial</groupId>
+			<artifactId>sqlite-jdbc</artifactId>
+			<version>${sqlite-jdbc.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate.orm</groupId>
+			<artifactId>hibernate-community-dialects</artifactId>
+		</dependency>
+
+		<!-- PDF text extraction, pure Java. -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>${pdfbox.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<finalName>study-assistant</finalName>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<!-- sqlite-jdbc loads a native library; this manifest entry lets
+			     `java -jar` run it without the JDK's restricted-method warning. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifestEntries>
+							<Enable-Native-Access>ALL-UNNAMED</Enable-Native-Access>
+						</manifestEntries>
+					</archive>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<!--
+		  Build the Angular app and embed it in the jar so `java -jar` serves
+		  everything. On by default; skip during backend-only dev iterations with
+		  `-DskipFrontend`.
+		-->
+		<profile>
+			<id>with-frontend</id>
+			<activation>
+				<property>
+					<name>!skipFrontend</name>
+				</property>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>exec-maven-plugin</artifactId>
+						<version>3.6.3</version>
+						<executions>
+							<execution>
+								<id>npm-install</id>
+								<phase>generate-resources</phase>
+								<goals><goal>exec</goal></goals>
+								<configuration>
+									<workingDirectory>${frontend.dir}</workingDirectory>
+									<executable>${npm.executable}</executable>
+									<arguments>
+										<argument>install</argument>
+										<argument>--no-audit</argument>
+										<argument>--no-fund</argument>
+									</arguments>
+								</configuration>
+							</execution>
+							<execution>
+								<id>npm-build</id>
+								<phase>generate-resources</phase>
+								<goals><goal>exec</goal></goals>
+								<configuration>
+									<workingDirectory>${frontend.dir}</workingDirectory>
+									<executable>${npm.executable}</executable>
+									<arguments>
+										<argument>run</argument>
+										<argument>build</argument>
+									</arguments>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-resources-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>copy-frontend</id>
+								<phase>process-resources</phase>
+								<goals><goal>copy-resources</goal></goals>
+								<configuration>
+									<outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+									<resources>
+										<resource>
+											<directory>${frontend.dist}</directory>
+										</resource>
+									</resources>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>windows-npm</id>
+			<activation>
+				<os><family>windows</family></os>
+			</activation>
+			<properties>
+				<npm.executable>npm.cmd</npm.executable>
+			</properties>
+		</profile>
+	</profiles>
+</project>

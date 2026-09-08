@@ -1,0 +1,6 @@
+Create study flashcards from the material. Rules:
+- One atomic concept per card. The front is a question or a term; the back is a complete, self-contained answer.
+- Prefer active recall (questions that make the student produce the answer) over recognition.
+- Cover the material thoroughly: aim for {{count}} cards spread across its topics.
+- Tag each card with a short topic label (2-4 words).
+- Write in {{language}}.

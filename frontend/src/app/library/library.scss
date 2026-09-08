@@ -1,0 +1,162 @@
+:host {
+  display: block;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.error {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  background: #ffe3e3;
+  color: #7d1a1a;
+  font-size: 0.9rem;
+}
+
+.job {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--surface);
+
+  &.failed {
+    border-color: #f1b3b3;
+    background: #fff5f5;
+  }
+
+  progress {
+    width: 100%;
+    height: 6px;
+    margin-top: 0.4rem;
+    accent-color: var(--accent);
+  }
+}
+
+.job-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.job-label {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.job-message {
+  color: var(--ink-dim);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dismiss {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--ink-dim);
+}
+
+.docs {
+  margin-top: 2rem;
+
+  h2 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-dim);
+    margin: 0 0 0.75rem;
+  }
+}
+
+.empty {
+  color: var(--ink-dim);
+}
+
+.doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.doc {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    'badge title delete'
+    'badge meta delete'
+    'badge error delete';
+  column-gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: var(--accent);
+  }
+}
+
+.badge {
+  grid-area: badge;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: var(--edge);
+  color: var(--ink-dim);
+
+  &.ready { background: #d8f3dc; color: #1b4332; }
+  &.error { background: #ffe3e3; color: #7d1a1a; }
+  &.extracting, &.queued { background: #fff3cd; color: #664d03; }
+}
+
+.doc-title {
+  grid-area: title;
+  font-weight: 600;
+}
+
+.doc-meta {
+  grid-area: meta;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+
+.doc-error {
+  grid-area: error;
+  font-size: 0.85rem;
+  color: #7d1a1a;
+}
+
+.delete {
+  grid-area: delete;
+  border: 1px solid var(--edge);
+  background: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  cursor: pointer;
+
+  &:hover {
+    border-color: #c0392b;
+    color: #c0392b;
+  }
+}

@@ -1,0 +1,37 @@
+<header class="topbar">
+  <h1><a href="/">Study Assistant</a></h1>
+
+  <div class="right">
+    @if (settings(); as s) {
+      <label class="model" [title]="s.ollama.reachable ? 'Model used for notes and quizzes' : 'Ollama is not running'">
+        <span class="dot" [class.ok]="s.ollama.reachable" aria-hidden="true"></span>
+        @if (s.ollama.reachable) {
+          <select (change)="setModel($any($event.target).value)">
+            @for (m of modelOptions(s); track m) {
+              <option [value]="m" [selected]="m === s.chatModel">{{ m }}</option>
+            }
+          </select>
+        } @else {
+          <span class="warn">Ollama offline</span>
+          <button type="button" class="retry" (click)="loadSettings()">Retry</button>
+        }
+      </label>
+    }
+
+    <span class="status" [class]="'status ' + backend()">
+      @switch (backend()) {
+        @case ('checking') { Connecting… }
+        @case ('online') { Backend online }
+        @case ('offline') { Backend offline }
+      }
+    </span>
+  </div>
+</header>
+
+@if (settingsError(); as msg) {
+  <p class="banner">{{ msg }}</p>
+}
+
+<main class="content">
+  <router-outlet />
+</main>

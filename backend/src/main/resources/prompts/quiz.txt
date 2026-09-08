@@ -1,0 +1,8 @@
+Create a {{count}}-question quiz from the material at {{difficulty}} difficulty. Use these question types: {{types}}.
+- mcq: exactly 4 plausible options, exactly one correct.
+- true_false: options are exactly ["True", "False"].
+- fill_blank: write the question with a ___ blank; options holds the single exact answer and correctIndex is 0.
+- correctIndex is the 0-based index of the correct option.
+- Every question needs a one-sentence explanation of why the answer is correct.
+- Tag each question with a short topic label.
+- Write in {{language}}.
