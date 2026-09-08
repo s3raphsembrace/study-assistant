@@ -109,6 +109,37 @@ public class TextCleaner {
 		return text.substring(0, cut).trim();
 	}
 
+	/**
+	 * Page-wise variant: the page holding the bibliography heading is cut at
+	 * it and later pages are blanked, so the list keeps its length and page
+	 * numbering stays intact.
+	 */
+	public List<String> stripReferences(List<String> pages) {
+		int totalChars = pages.stream().mapToInt(p -> p == null ? 0 : p.length()).sum();
+		int seen = 0;
+		int cutPage = -1;
+		int cutPos = -1;
+		for (int i = 0; i < pages.size(); i++) {
+			String p = pages.get(i) == null ? "" : pages.get(i);
+			var m = REFERENCES_HEADING.matcher(p);
+			while (m.find()) {
+				if (seen + m.start() >= totalChars / 2) {
+					cutPage = i;
+					cutPos = m.start();
+				}
+			}
+			seen += p.length();
+		}
+		if (cutPage < 0) return pages;
+		List<String> out = new ArrayList<>(pages.size());
+		for (int i = 0; i < pages.size(); i++) {
+			if (i < cutPage) out.add(pages.get(i));
+			else if (i == cutPage) out.add(pages.get(i).substring(0, cutPos).trim());
+			else out.add("");
+		}
+		return out;
+	}
+
 	public String joinPages(List<String> pages) {
 		StringBuilder sb = new StringBuilder();
 		for (String p : pages) {

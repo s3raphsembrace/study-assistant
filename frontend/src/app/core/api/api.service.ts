@@ -21,6 +21,8 @@ export interface DocumentSummary {
   error: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Page images are available at /api/documents/{id}/pages/{n}/image. */
+  hasImages: boolean;
 }
 
 export interface PageView {

@@ -93,7 +93,8 @@ public class GenerationPipeline {
 		jobs.progress(jobId, stage, 0.0, "Preparing " + label(kind).toLowerCase() + "…");
 
 		String content = switch (kind) {
-			case NOTES -> generator.notes(sourceText(documentId),
+			case NOTES -> generator.notes(sourcePages(documentId),
+					doc.getSourceKind() == Document.SourceKind.PDF,
 					(f, m) -> jobs.progress(jobId, stage, f, m));
 			case SPOKEN -> generator.spoken(notesOrSource(documentId),
 					(f, m) -> jobs.progress(jobId, stage, f, m));
@@ -147,15 +148,22 @@ public class GenerationPipeline {
 			artifacts.save(new Artifact(documentId, kind, content, model));
 		}
 
-		if (kind == Artifact.Kind.NOTES) maybeImproveTitle(doc, content);
+		if (kind == Artifact.Kind.NOTES) maybeImproveTitle(doc, GenerationService.stripSlideRefs(content));
 		log.info("Generated {} for document {} with {}", kind, documentId, model);
 	}
 
+	/** Cleaned page texts with any trailing bibliography removed; index 0 is page 1. */
+	private List<String> sourcePages(Long documentId) {
+		List<String> list = cleaner.stripReferences(
+				pages.findByDocumentIdOrderByPageNumber(documentId).stream().map(DocumentPage::getText).toList());
+		if (list.stream().allMatch(p -> p == null || p.isBlank())) {
+			throw new IllegalStateException("This document has no extracted text yet.");
+		}
+		return list;
+	}
+
 	private String sourceText(Long documentId) {
-		String text = cleaner.stripReferences(cleaner.joinPages(
-				pages.findByDocumentIdOrderByPageNumber(documentId).stream().map(DocumentPage::getText).toList()));
-		if (text.isBlank()) throw new IllegalStateException("This document has no extracted text yet.");
-		return text;
+		return cleaner.joinPages(sourcePages(documentId));
 	}
 
 	/**
@@ -168,7 +176,7 @@ public class GenerationPipeline {
 		if (spoken.isPresent() && !spoken.get().getContent().isBlank()) return spoken.get().getContent();
 		Optional<Artifact> notes = artifacts.findByDocumentIdAndKind(documentId, Artifact.Kind.NOTES);
 		if (notes.isEmpty()) throw new IllegalStateException("Generate the notes first; the audio reads them.");
-		String text = generator.spoken(notes.get().getContent(),
+		String text = generator.spoken(GenerationService.stripSlideRefs(notes.get().getContent()),
 				(f, m) -> jobs.progress(jobId, "spoken", f * 0.3, m));
 		artifacts.save(new Artifact(documentId, Artifact.Kind.SPOKEN, text, settings.chatModel()));
 		return text;
@@ -177,6 +185,7 @@ public class GenerationPipeline {
 	private String notesOrSource(Long documentId) {
 		return artifacts.findByDocumentIdAndKind(documentId, Artifact.Kind.NOTES)
 				.map(Artifact::getContent)
+				.map(GenerationService::stripSlideRefs)
 				.filter(c -> !c.isBlank())
 				.orElseGet(() -> sourceText(documentId));
 	}

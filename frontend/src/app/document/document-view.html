@@ -195,7 +195,7 @@
           @switch (kind) {
             @case ('NOTES') {
               @if (notes(); as md) {
-                <app-markdown class="notes" [source]="md" />
+                <app-markdown class="notes" [source]="md" [imageBase]="d.hasImages ? '/api/documents/' + d.id + '/pages' : null" />
               } @else {
                 <p class="working">Loading…</p>
               }

@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import app.study.config.SettingsService;
+import app.study.ingest.PageRenderer;
 import app.study.ingest.PdfExtractor;
 import app.study.ingest.TextCleaner;
 import app.study.store.Artifact;
@@ -34,10 +35,11 @@ public class IngestPipeline {
 	private final JobService jobs;
 	private final GenerationPipeline generation;
 	private final SettingsService settings;
+	private final PageRenderer renderer;
 
 	public IngestPipeline(DocumentRepository documents, DocumentPageRepository pages,
 			PdfExtractor pdf, TextCleaner cleaner, JobService jobs, GenerationPipeline generation,
-			SettingsService settings) {
+			SettingsService settings, PageRenderer renderer) {
 		this.documents = documents;
 		this.pages = pages;
 		this.pdf = pdf;
@@ -45,6 +47,7 @@ public class IngestPipeline {
 		this.jobs = jobs;
 		this.generation = generation;
 		this.settings = settings;
+		this.renderer = renderer;
 	}
 
 	@Async
@@ -80,6 +83,16 @@ public class IngestPipeline {
 			if (chars == 0) {
 				throw new IllegalStateException(
 						"No text found. This PDF is probably scanned images; OCR isn't enabled yet.");
+			}
+
+			// Slide images for the notes. Best effort: a rendering failure shouldn't lose the text.
+			try {
+				int total = ex.pageCount();
+				renderer.renderAll(documentId, file, p ->
+						jobs.progress(jobId, "render", 0.85 + 0.13 * p / Math.max(1, total),
+								"Rendering slide " + p + " of " + total + "\u2026"));
+			} catch (Exception e) {
+				log.warn("Page images for document {} couldn't be rendered: {}", documentId, e.toString());
 			}
 
 			if (ex.metadataTitle() != null && looksLikeRealTitle(ex.metadataTitle(), doc.getFilename())) {

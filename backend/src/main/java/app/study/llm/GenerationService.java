@@ -79,21 +79,43 @@ public class GenerationService {
 
 	// ---- notes -------------------------------------------------------------
 
-	public String notes(String source, Progress progress) {
-		String language = settings.language();
-		List<String> chunks = Chunker.chunk(source, props.chunkTokens(), props.overlapTokens());
-		if (chunks.isEmpty()) throw new LlmException(LlmException.Kind.BAD_RESPONSE, "There is no text to summarise.");
+	/** With slide strips on, sections cover at most this many pages so each strip stays short. */
+	private static final int SLIDES_PER_SECTION = 8;
 
-		if (chunks.size() == 1) {
+	private static final java.util.regex.Pattern SLIDES_LINE =
+			java.util.regex.Pattern.compile("(?m)^@slides\\[[^\\]]*\\][ \\t]*$\\n?");
+
+	/** Marker line the frontend renders as a strip of page thumbnails. */
+	public static String slidesMarker(PageChunker.Section s) {
+		return "@slides[" + s.pageRange() + "]";
+	}
+
+	/** Notes without the slide markers, for prompts and speech. */
+	public static String stripSlideRefs(String markdown) {
+		return SLIDES_LINE.matcher(markdown).replaceAll("").strip();
+	}
+
+	/**
+	 * Study notes for a document given as page texts. With {@code attachSlides}
+	 * each section of the notes is prefixed with a marker naming the pages it
+	 * was written from, so the UI can show those slides above the section.
+	 */
+	public String notes(List<String> pages, boolean attachSlides, Progress progress) {
+		String language = settings.language();
+		List<PageChunker.Section> sections = PageChunker.chunk(pages, props.chunkTokens(),
+				attachSlides ? SLIDES_PER_SECTION : 0);
+		if (sections.isEmpty()) throw new LlmException(LlmException.Kind.BAD_RESPONSE, "There is no text to summarise.");
+
+		if (sections.size() == 1) {
 			progress.report(0.05, "Writing notes…");
-			String out = stream(prompts.render("notes-single", Map.of("language", language)),
-					"Source material:\n\n" + chunks.get(0), 0.05, 0.95, "Writing notes", progress);
+			String out = unfence(stream(prompts.render("notes-single", Map.of("language", language)),
+					"Source material:\n\n" + sections.get(0).text(), 0.05, 0.95, "Writing notes", progress));
 			progress.report(1, "Notes ready");
-			return unfence(out);
+			return attachSlides ? slidesMarker(sections.get(0)) + "\n\n" + out : out;
 		}
 
-		int total = chunks.size();
-		List<String> sections = new ArrayList<>(total);
+		int total = sections.size();
+		List<String> written = new ArrayList<>(total);
 		double perChunk = 0.8 / total;
 		for (int i = 0; i < total; i++) {
 			double from = 0.05 + i * perChunk;
@@ -101,13 +123,16 @@ public class GenerationService {
 					Map.of("language", language, "part", i + 1, "total", total));
 			String label = "Writing section " + (i + 1) + " of " + total;
 			progress.report(from, label + "…");
-			sections.add(stripLeadingSummary(unfence(stream(system,
-					"Source material (section " + (i + 1) + " of " + total + "):\n\n" + chunks.get(i),
-					from, from + perChunk, label, SECTION_MAX_TOKENS, progress))));
+			String body = stripLeadingSummary(unfence(stream(system,
+					"Source material (section " + (i + 1) + " of " + total + "):\n\n" + sections.get(i).text(),
+					from, from + perChunk, label, SECTION_MAX_TOKENS, progress)));
+			written.add(attachSlides ? slidesMarker(sections.get(i)) + "\n\n" + body : body);
 		}
 
-		String combined = String.join("\n\n", sections);
-		if (Chunker.estimateTokens(combined) <= props.chunkTokens()) {
+		String combined = String.join("\n\n", written);
+		// A merge pass rewrites everything and would lose the slide markers, so it
+		// only runs for marker-free notes that fit in one call.
+		if (!attachSlides && Chunker.estimateTokens(combined) <= props.chunkTokens()) {
 			progress.report(0.86, "Merging sections…");
 			String merged = stream(prompts.render("notes-merge", Map.of("language", language)),
 					"Section notes:\n\n" + combined, 0.86, 0.98, "Merging sections", progress);
@@ -115,18 +140,25 @@ public class GenerationService {
 			return unfence(merged);
 		}
 
-		// Too long to merge in one pass: frame the sections with a generated overview + takeaways.
+		// Frame the sections with a generated overview + takeaways.
 		progress.report(0.88, "Writing overview and takeaways…");
 		String frame = unfence(stream(prompts.render("notes-frame", Map.of("language", language)),
-				"Study notes:\n\n" + Chunker.capTokens(combined, props.chunkTokens()),
+				"Study notes:\n\n" + Chunker.capTokens(stripSlideRefs(combined), props.chunkTokens()),
 				0.88, 0.98, "Writing overview", 1024, progress));
 		String[] parts = splitFrame(frame);
+		// The overview must be plain prose: drop any heading the model put over it.
+		String overview = parts[0].replaceAll("(?m)^\\s*#+.*$", "").trim();
 		StringBuilder sb = new StringBuilder();
-		if (!parts[0].isBlank()) sb.append(parts[0].trim()).append("\n\n");
+		if (!overview.isBlank()) sb.append(overview).append("\n\n");
 		sb.append(combined.trim());
 		if (!parts[1].isBlank()) sb.append("\n\n").append(parts[1].trim());
 		progress.report(1, "Notes ready");
-		return sb.toString();
+		return dropBareHashes(sb.toString());
+	}
+
+	/** Lines that are only "#" (or "##") are a model hiccup, not a heading. */
+	static String dropBareHashes(String md) {
+		return md.replaceAll("(?m)^[ \\t]*#+[ \\t]*\\n", "").replaceAll("\\n{3,}", "\n\n");
 	}
 
 	/** Plain-text rewrite of Markdown notes for the TTS voice, chunked if long. */

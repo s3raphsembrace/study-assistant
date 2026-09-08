@@ -42,6 +42,7 @@ export function splitSentences(text: string): string[] {
  */
 export function markdownToSpeech(md: string): string {
   let t = md.replace(/\r\n/g, '\n');
+  t = t.replace(/^[ \t]*@slides\[[^\]]*\][ \t]*$/gm, '');
   t = t.replace(/```[\s\S]*?```/g, ' (code omitted) ');
   t = t.replace(/\$\$([\s\S]*?)\$\$/g, (_, m) => ` ${latexToWords(m)} `);
   t = t.replace(/\$([^$\n]+?)\$/g, (_, m) => ` ${latexToWords(m)} `);

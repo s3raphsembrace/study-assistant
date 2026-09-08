@@ -74,3 +74,51 @@
 
   .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25em 0; }
 }
+
+.md .slide-strip {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding: 0.5rem 0.25rem 0.75rem;
+  margin: 0.5rem 0 1rem;
+  border-bottom: 1px solid var(--edge);
+  scroll-snap-type: x proximity;
+
+  .slide {
+    position: relative;
+    flex: 0 0 auto;
+    width: 190px;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    scroll-snap-align: start;
+    transition: border-color 0.15s, transform 0.15s;
+
+    &:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      background: #fff;
+    }
+  }
+
+  .slide-no {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+  }
+}

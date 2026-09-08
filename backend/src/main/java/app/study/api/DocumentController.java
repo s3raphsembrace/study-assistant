@@ -25,7 +25,15 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
+
 import app.study.config.AppProperties;
+import app.study.ingest.PageRenderer;
 import app.study.ingest.TextCleaner;
 import app.study.jobs.IngestPipeline;
 import app.study.jobs.JobService;
@@ -46,12 +54,12 @@ public class DocumentController {
 	public record DocumentSummary(
 			Long id, String title, String filename, Document.SourceKind sourceKind,
 			Document.Status status, Integer pageCount, Integer charCount, String error,
-			Instant createdAt, Instant updatedAt) {
+			Instant createdAt, Instant updatedAt, boolean hasImages) {
 
-		static DocumentSummary of(Document d) {
+		static DocumentSummary of(Document d, boolean hasImages) {
 			return new DocumentSummary(d.getId(), d.getTitle(), d.getFilename(), d.getSourceKind(),
 					d.getStatus(), d.getPageCount(), d.getCharCount(), d.getError(),
-					d.getCreatedAt(), d.getUpdatedAt());
+					d.getCreatedAt(), d.getUpdatedAt(), hasImages);
 		}
 	}
 
@@ -66,10 +74,11 @@ public class DocumentController {
 	private final JobService jobs;
 	private final TextCleaner cleaner;
 	private final AppProperties props;
+	private final PageRenderer renderer;
 
 	public DocumentController(DocumentRepository documents, DocumentPageRepository pages,
 			ArtifactRepository artifacts, IngestPipeline pipeline, JobService jobs, TextCleaner cleaner,
-			AppProperties props) {
+			AppProperties props, PageRenderer renderer) {
 		this.documents = documents;
 		this.pages = pages;
 		this.artifacts = artifacts;
@@ -77,16 +86,23 @@ public class DocumentController {
 		this.jobs = jobs;
 		this.cleaner = cleaner;
 		this.props = props;
+		this.renderer = renderer;
+	}
+
+	private DocumentSummary summary(Document d) {
+		// PDFs always have images: they're rendered on first request if missing.
+		return DocumentSummary.of(d, d.getSourceKind() == Document.SourceKind.PDF
+				&& d.getStatus() == Document.Status.READY && d.getStoredPath() != null);
 	}
 
 	@GetMapping
 	public List<DocumentSummary> list() {
-		return documents.findAllByOrderByCreatedAtDesc().stream().map(DocumentSummary::of).toList();
+		return documents.findAllByOrderByCreatedAtDesc().stream().map(this::summary).toList();
 	}
 
 	@GetMapping("/{id}")
 	public DocumentSummary get(@PathVariable Long id) {
-		return DocumentSummary.of(find(id));
+		return summary(find(id));
 	}
 
 	@GetMapping("/{id}/pages")
@@ -95,6 +111,27 @@ public class DocumentController {
 		return pages.findByDocumentIdOrderByPageNumber(id).stream()
 				.map(p -> new PageView(p.getPageNumber(), p.getText()))
 				.toList();
+	}
+
+	/** Rendered page image (JPEG). Rendered on demand for documents that predate page images. */
+	@GetMapping(value = "/{id}/pages/{page}/image", produces = "image/jpeg")
+	public ResponseEntity<Resource> pageImage(@PathVariable Long id, @PathVariable int page) throws IOException {
+		Document doc = find(id);
+		if (page < 1 || (doc.getPageCount() != null && page > doc.getPageCount())) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No page " + page + ".");
+		}
+		Path img = renderer.imagePath(id, page);
+		if (!Files.isRegularFile(img)) {
+			if (doc.getStoredPath() == null || !Files.isRegularFile(Path.of(doc.getStoredPath()))) {
+				throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The original PDF is no longer available.");
+			}
+			renderer.renderAll(id, Path.of(doc.getStoredPath()), null);
+			if (!Files.isRegularFile(img)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No page " + page + ".");
+		}
+		return ResponseEntity.ok()
+				.contentType(MediaType.IMAGE_JPEG)
+				.cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS))
+				.body(new FileSystemResource(img));
 	}
 
 	@GetMapping(value = "/{id}/text", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -141,7 +178,7 @@ public class DocumentController {
 
 			JobService.JobView job = jobs.create(doc.getId(), "INGEST", original);
 			pipeline.ingestPdf(doc.getId(), job.id());
-			results.add(new UploadResult(DocumentSummary.of(doc), job));
+			results.add(new UploadResult(summary(doc), job));
 		}
 		return results;
 	}
@@ -153,6 +190,7 @@ public class DocumentController {
 		pages.deleteByDocumentId(id);
 		artifacts.deleteByDocumentId(id);
 		documents.delete(doc);
+		renderer.delete(id);
 		if (doc.getStoredPath() != null) {
 			Files.deleteIfExists(Path.of(doc.getStoredPath()));
 		}
