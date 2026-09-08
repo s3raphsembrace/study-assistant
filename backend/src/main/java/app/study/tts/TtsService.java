@@ -81,8 +81,8 @@ public class TtsService {
 	public Status status() {
 		boolean py = pythonFound();
 		boolean kk = py && kokoroInstalled();
-		Optional<Path> model = findFile(props.modelPaths());
-		Optional<Path> voices = findFile(props.voicesPaths());
+		Optional<Path> model = findFile(modelCandidates());
+		Optional<Path> voices = findFile(voicesCandidates());
 		KokoroSidecar s = sidecar;
 		boolean running = s != null && s.isRunning();
 		String missing = model.isEmpty() && voices.isEmpty() ? "voice model (about 340 MB, one time)"
@@ -100,15 +100,34 @@ public class TtsService {
 
 	/** Downloads the model files into tools/kokoro. Only ever called from a user action. */
 	public void downloadModels(DoubleConsumer progress) throws IOException {
-		Path dir = Path.of("tools", "kokoro").toAbsolutePath();
+		Path dir = kokoroDir();
 		Files.createDirectories(dir);
-		if (findFile(props.modelPaths()).isEmpty()) {
+		if (findFile(modelCandidates()).isEmpty()) {
 			download(props.modelUrl(), dir.resolve("kokoro-v1.0.onnx"), p -> progress.accept(p * 0.9));
 		}
-		if (findFile(props.voicesPaths()).isEmpty()) {
+		if (findFile(voicesCandidates()).isEmpty()) {
 			download(props.voicesUrl(), dir.resolve("voices-v1.0.bin"), p -> progress.accept(0.9 + p * 0.1));
 		}
 		progress.accept(1.0);
+	}
+
+	/** Our own download location always wins over the configured fallbacks. */
+	private Path kokoroDir() {
+		return app.toolsPath().resolve("kokoro");
+	}
+
+	private List<String> modelCandidates() {
+		List<String> out = new ArrayList<>();
+		out.add(kokoroDir().resolve("kokoro-v1.0.onnx").toString());
+		out.addAll(props.modelPaths());
+		return out;
+	}
+
+	private List<String> voicesCandidates() {
+		List<String> out = new ArrayList<>();
+		out.add(kokoroDir().resolve("voices-v1.0.bin").toString());
+		out.addAll(props.voicesPaths());
+		return out;
 	}
 
 	/** Synthesize {@code text} into {@code out} (WAV, mono, 16-bit). */
@@ -181,11 +200,23 @@ public class TtsService {
 		}
 	}
 
+	/** Anything smaller is a failed download (a "Not Found" page, a .part stub), not a model. */
+	private static final long MIN_MODEL_BYTES = 1L << 20;
+
 	private static Optional<Path> findFile(List<String> candidates) {
 		String home = System.getProperty("user.home");
 		for (String c : candidates) {
 			Path p = Path.of(c.startsWith("~") ? home + c.substring(1) : c).toAbsolutePath().normalize();
-			if (Files.isRegularFile(p)) return Optional.of(p);
+			if (!Files.isRegularFile(p)) continue;
+			try {
+				if (Files.size(p) < MIN_MODEL_BYTES) {
+					log.warn("Ignoring {}: only {} bytes, looks like a failed download", p, Files.size(p));
+					continue;
+				}
+			} catch (IOException e) {
+				continue;
+			}
+			return Optional.of(p);
 		}
 		return Optional.empty();
 	}

@@ -34,3 +34,4 @@ build/
 
 ### App runtime data (dev fallback) ###
 data/
+tools/
