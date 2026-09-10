@@ -103,8 +103,12 @@ Status as of 2026-09-08.
 3. **TTS** — done, Kokoro untested pending the 27 MB voices file. Web Speech
    reader with sentence highlighting, speed and voice; "spoken version" pass;
    Kokoro sidecar + WAV export with in-app model download.
-4. **Audio/video sources** — next. Drop mp3/mp4/wav or paste a YouTube URL;
-   yt-dlp captions first, whisper.cpp fallback (needs ffmpeg + a ggml model).
+4. **Audio/video sources** — done. Drop mp3/mp4/wav or paste a YouTube URL.
+   ffmpeg decodes to 16 kHz mono, whisper.cpp transcribes locally, yt-dlp
+   fetches captions first and the audio track only when there are none. All
+   three tools install themselves into `tools/` on one button press, and
+   anything already on PATH is reused. Transcripts are stored in timestamped
+   parts so notes sections map to points in the recording.
 5. **Chat with the material**: embeddings via `nomic-embed-text`, cosine
    search in Java over stored chunk vectors, grounded answers.
 6. **Packaging**: optional Electron/Tauri shell; OCR toggle; settings page.

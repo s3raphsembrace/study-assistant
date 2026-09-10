@@ -143,7 +143,7 @@ public class TtsService {
 			throw new IOException("Unknown voice \"" + v + "\". Available: " + String.join(", ", s.voiceIds()));
 		}
 
-		List<String> batches = batch(text, props.batchChars());
+		List<String> batches = batch(forSpeech(text), props.batchChars());
 		if (batches.isEmpty()) throw new IOException("There is no text to read.");
 
 		ByteArrayOutputStream pcm = new ByteArrayOutputStream();
@@ -250,6 +250,33 @@ public class TtsService {
 		} finally {
 			Files.deleteIfExists(tmp);
 		}
+	}
+
+	/**
+	 * Last line of defence before the voice: strip any Markdown the "spoken
+	 * version" pass left behind. Without this a leftover heading is read out as
+	 * "hash hash key takeaways", and asterisks become audible noise.
+	 */
+	static String forSpeech(String text) {
+		String t = text.replace("\r\n", "\n");
+		t = t.replaceAll("(?m)^[ \\t]*@slides\\[[^\\]]*\\][ \\t]*$", "");
+		t = t.replaceAll("```[\\s\\S]*?```", " ");
+		t = t.replaceAll("(?m)^[ \\t]{0,3}#{1,6}[ \\t]*", "");        // headings
+		t = t.replaceAll("(?m)^[ \\t]*>[ \\t]?", "");                  // block quotes
+		t = t.replaceAll("(?m)^[ \\t]*[-*+][ \\t]+", "");              // bullets
+		t = t.replaceAll("(?m)^[ \\t]*\\d+\\.[ \\t]+", "");            // numbered items
+		t = t.replaceAll("(?m)^[ \\t]*([-*_])([ \\t]*\\1){2,}[ \\t]*$", ""); // rules
+		t = t.replaceAll("!\\[[^\\]]*]\\([^)]*\\)", "");               // images
+		t = t.replaceAll("\\[([^\\]]+)]\\([^)]*\\)", "$1");            // links keep their text
+		t = t.replaceAll("(\\*\\*|__)(.+?)\\1", "$2");                 // bold
+		t = t.replaceAll("(?<![\\w*])[*_](?!\\s)(.+?)(?<!\\s)[*_](?![\\w*])", "$1"); // italics
+		t = t.replaceAll("`([^`]+)`", "$1");
+		t = t.replaceAll("\\|", " ");                                  // table pipes
+		t = t.replaceAll("[ \\t]{2,}", " ");
+		// Removals above can leave whitespace-only lines; drop them so the
+		// paragraph collapse below sees real blank lines.
+		t = t.replaceAll("(?m)[ \\t]+$", "");
+		return t.replaceAll("\\n{3,}", "\n\n").strip();
 	}
 
 	/** Group sentences into batches of roughly {@code maxChars}, never splitting a sentence. */

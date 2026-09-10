@@ -1,5 +1,47 @@
 <section class="upload">
-  <app-drop-zone [disabled]="uploading()" (files)="onFiles($event)" (rejected)="onRejected($event)" />
+  <app-drop-zone
+    [disabled]="uploading()"
+    [accept]="accept"
+    [hint]="acceptHint"
+    (files)="onFiles($event)"
+    (rejected)="onRejected($event)"
+  />
+
+  <form class="url-row" (submit)="addUrl(); $event.preventDefault()">
+    <input
+      type="url"
+      placeholder="…or paste a YouTube lecture link"
+      [value]="url()"
+      (input)="url.set($any($event.target).value)"
+      [disabled]="uploading()"
+      aria-label="YouTube link"
+    />
+    <button type="submit" class="primary" [disabled]="uploading() || !url().trim()">Add video</button>
+  </form>
+
+  @if (media(); as m) {
+    @if (!m.transcriptionReady || !m.youtubeReady) {
+      <div class="setup">
+        @if (mediaSetupJob(); as job) {
+          <div class="setup-progress">
+            <span>{{ job.status === 'ERROR' ? job.error : job.message }}</span>
+            <progress [value]="job.progress" max="1"></progress>
+          </div>
+          @if (job.status === 'ERROR') {
+            <button type="button" class="ghost" (click)="setupMedia()">Try again</button>
+          }
+        } @else {
+          <span class="hint">
+            Audio, video and YouTube need ffmpeg, whisper.cpp and yt-dlp. They run entirely on your
+            machine once installed.
+          </span>
+          <button type="button" class="primary" (click)="setupMedia()">
+            Install media tools ({{ m.downloadMegabytes }} MB)
+          </button>
+        }
+      </div>
+    }
+  }
 
   @if (error(); as msg) {
     <p class="error" role="alert">{{ msg }}</p>
@@ -22,7 +64,7 @@
 <section class="docs">
   <h2>Library</h2>
   @if (documents().length === 0) {
-    <p class="empty">Nothing here yet. Drop a lecture PDF above to get started.</p>
+    <p class="empty">Nothing here yet. Drop a lecture PDF or recording above to get started.</p>
   } @else {
     <ul class="doc-list">
       @for (doc of documents(); track doc.id) {
@@ -31,8 +73,10 @@
             <span class="badge" [class]="'badge ' + doc.status.toLowerCase()">{{ doc.status }}</span>
             <span class="doc-title">{{ doc.title }}</span>
             <span class="doc-meta">
-              {{ doc.filename }}
-              @if (doc.pageCount) { · {{ doc.pageCount }} pages }
+              {{ kindLabel(doc) }}
+              @if (doc.sourceKind !== 'YOUTUBE') { · {{ doc.filename }} }
+              @if (doc.durationSeconds) { · {{ duration(doc.durationSeconds) }} }
+              @else if (doc.pageCount && doc.sourceKind === 'PDF') { · {{ doc.pageCount }} pages }
               · {{ doc.createdAt | date: 'MMM d, h:mm a' }}
             </span>
             @if (doc.status === 'ERROR' && doc.error) {

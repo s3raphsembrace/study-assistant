@@ -26,6 +26,8 @@ import { Component, ElementRef, input, output, signal, viewChild } from '@angula
 export class DropZone {
   /** Accepted extensions, lower-case, with the dot. */
   readonly accept = input<string[]>(['.pdf']);
+  /** Short description of what may be dropped; defaults to the extension list. */
+  readonly hint = input<string>('');
   readonly disabled = input(false);
   readonly files = output<File[]>();
   readonly rejected = output<File[]>();
@@ -36,6 +38,10 @@ export class DropZone {
 
   protected acceptAttr(): string {
     return this.accept().join(',');
+  }
+
+  protected hintText(): string {
+    return this.hint() || this.accept().join(', ');
   }
 
   protected onDragOver(ev: DragEvent): void {

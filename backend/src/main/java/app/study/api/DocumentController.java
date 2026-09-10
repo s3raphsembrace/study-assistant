@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -41,6 +42,7 @@ import app.study.jobs.Titles;
 import app.study.store.ArtifactRepository;
 import app.study.store.Document;
 import app.study.store.DocumentPage;
+import app.study.media.YoutubeExtractor;
 import app.study.store.DocumentPageRepository;
 import app.study.store.DocumentRepository;
 
@@ -51,17 +53,28 @@ public class DocumentController {
 
 	private static final byte[] PDF_MAGIC = "%PDF".getBytes(StandardCharsets.US_ASCII);
 
+	/** Everything ffmpeg will happily decode for us; the audio track is all we keep. */
+	private static final List<String> AUDIO_EXTENSIONS = List.of(
+			".mp3", ".m4a", ".wav", ".aac", ".ogg", ".oga", ".opus", ".flac", ".wma", ".aiff", ".aif");
+	private static final List<String> VIDEO_EXTENSIONS = List.of(
+			".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".flv", ".mpg", ".mpeg", ".ts");
+
 	public record DocumentSummary(
 			Long id, String title, String filename, Document.SourceKind sourceKind,
 			Document.Status status, Integer pageCount, Integer charCount, String error,
-			Instant createdAt, Instant updatedAt, boolean hasImages) {
+			Instant createdAt, Instant updatedAt, boolean hasImages,
+			String sourceUrl, Double durationSeconds) {
 
 		static DocumentSummary of(Document d, boolean hasImages) {
 			return new DocumentSummary(d.getId(), d.getTitle(), d.getFilename(), d.getSourceKind(),
 					d.getStatus(), d.getPageCount(), d.getCharCount(), d.getError(),
-					d.getCreatedAt(), d.getUpdatedAt(), hasImages);
+					d.getCreatedAt(), d.getUpdatedAt(), hasImages,
+					d.getSourceUrl(), d.getDurationSeconds());
 		}
 	}
+
+	/** Body of {@code POST /api/documents/url}. */
+	public record UrlRequest(String url) {}
 
 	public record PageView(int pageNumber, String text) {}
 
@@ -157,15 +170,12 @@ public class DocumentController {
 		List<UploadResult> results = new ArrayList<>();
 		for (MultipartFile file : files) {
 			String original = safeFilename(file.getOriginalFilename());
-			if (!isPdf(file, original)) {
-				throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-						"\"" + original + "\" isn't a PDF. Only PDF files are supported right now.");
-			}
+			Document.SourceKind kind = kindOf(file, original);
 
 			Document doc = new Document();
 			doc.setTitle(Titles.fromFilename(original));
 			doc.setFilename(original);
-			doc.setSourceKind(Document.SourceKind.PDF);
+			doc.setSourceKind(kind);
 			doc.setStatus(Document.Status.QUEUED);
 			doc = documents.save(doc);
 
@@ -177,10 +187,33 @@ public class DocumentController {
 			doc = documents.save(doc);
 
 			JobService.JobView job = jobs.create(doc.getId(), "INGEST", original);
-			pipeline.ingestPdf(doc.getId(), job.id());
+			if (kind == Document.SourceKind.PDF) pipeline.ingestPdf(doc.getId(), job.id());
+			else pipeline.ingestMedia(doc.getId(), job.id());
 			results.add(new UploadResult(summary(doc), job));
 		}
 		return results;
+	}
+
+	/** Add a YouTube lecture by link. Captions are used when the video has them. */
+	@PostMapping(value = "/url", consumes = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseStatus(HttpStatus.ACCEPTED)
+	public UploadResult addUrl(@RequestBody UrlRequest body) {
+		String url = body == null || body.url() == null ? "" : body.url().strip();
+		if (!YoutubeExtractor.isYoutube(url)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"That doesn't look like a YouTube link. Other sites aren't supported yet.");
+		}
+		Document doc = new Document();
+		doc.setTitle("YouTube video");
+		doc.setFilename(url);
+		doc.setSourceUrl(url);
+		doc.setSourceKind(Document.SourceKind.YOUTUBE);
+		doc.setStatus(Document.Status.QUEUED);
+		doc = documents.save(doc);
+
+		JobService.JobView job = jobs.create(doc.getId(), "INGEST", url);
+		pipeline.ingestYoutube(doc.getId(), job.id());
+		return new UploadResult(summary(doc), job);
 	}
 
 	@DeleteMapping("/{id}")
@@ -201,12 +234,19 @@ public class DocumentController {
 				new ResponseStatusException(HttpStatus.NOT_FOUND, "Document " + id + " not found."));
 	}
 
-	private static boolean isPdf(MultipartFile file, String name) throws IOException {
-		boolean byName = name.toLowerCase(Locale.ROOT).endsWith(".pdf");
-		try (InputStream in = file.getInputStream()) {
-			byte[] head = in.readNBytes(PDF_MAGIC.length);
-			return byName || Arrays.equals(head, PDF_MAGIC);
+	/** PDF, or an audio/video file for transcription. Anything else is rejected. */
+	private static Document.SourceKind kindOf(MultipartFile file, String name) throws IOException {
+		String lower = name.toLowerCase(Locale.ROOT);
+		if (lower.endsWith(".pdf")) return Document.SourceKind.PDF;
+		if (AUDIO_EXTENSIONS.stream().anyMatch(lower::endsWith)
+				|| VIDEO_EXTENSIONS.stream().anyMatch(lower::endsWith)) {
+			return Document.SourceKind.AUDIO;
 		}
+		try (InputStream in = file.getInputStream()) {
+			if (Arrays.equals(in.readNBytes(PDF_MAGIC.length), PDF_MAGIC)) return Document.SourceKind.PDF;
+		}
+		throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+				"\"" + name + "\" isn't a PDF, audio or video file.");
 	}
 
 	/** Keep just the base name and strip characters that are unsafe in a path. */
@@ -215,6 +255,6 @@ public class DocumentController {
 		int slash = Math.max(base.lastIndexOf('/'), base.lastIndexOf('\\'));
 		if (slash >= 0) base = base.substring(slash + 1);
 		base = base.replaceAll("[^A-Za-z0-9._ ()\\-]", "_").trim();
-		return base.isEmpty() ? "upload.pdf" : base;
+		return base.isEmpty() ? "upload" : base;
 	}
 }

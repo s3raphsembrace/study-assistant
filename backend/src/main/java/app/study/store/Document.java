@@ -46,6 +46,13 @@ public class Document {
 	private Integer pageCount;
 	private Integer charCount;
 
+	/** Original link for YOUTUBE sources. */
+	@Column(length = 500)
+	private String sourceUrl;
+
+	/** Playing time for AUDIO and YOUTUBE sources. */
+	private Double durationSeconds;
+
 	@Column(columnDefinition = "TEXT")
 	private String error;
 
@@ -82,6 +89,10 @@ public class Document {
 	public void setPageCount(Integer pageCount) { this.pageCount = pageCount; }
 	public Integer getCharCount() { return charCount; }
 	public void setCharCount(Integer charCount) { this.charCount = charCount; }
+	public String getSourceUrl() { return sourceUrl; }
+	public void setSourceUrl(String sourceUrl) { this.sourceUrl = sourceUrl; }
+	public Double getDurationSeconds() { return durationSeconds; }
+	public void setDurationSeconds(Double durationSeconds) { this.durationSeconds = durationSeconds; }
 	public String getError() { return error; }
 	public void setError(String error) { this.error = error; }
 	public Instant getCreatedAt() { return createdAt; }

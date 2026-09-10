@@ -11,9 +11,13 @@ See [docs/PLAN.md](docs/PLAN.md) for the architecture and roadmap.
 
 - Drag-and-drop one or more PDFs; text is extracted page by page with running
   headers, slide numbers and hyphenation cleaned up. Live progress per file.
+- Drop an audio or video recording, or paste a YouTube lecture link. YouTube
+  captions are used when the video has them; otherwise the audio is
+  transcribed locally with whisper.cpp.
 - Notes are generated automatically after extraction (map/reduce over chunks
   for long documents), then key terms, flashcards and a self-grading quiz on
-  demand from the document page. Math renders with KaTeX.
+  demand from the document page. Math renders with KaTeX. Each section of the
+  notes shows the slides it was written from.
 - **Listen** tab: reads the notes aloud with the browser's built-in voices
   (sentence highlighting, speed, voice picker), or with Kokoro for a natural
   voice and a downloadable WAV. A "spoken version" pass rewrites math and
@@ -44,6 +48,11 @@ Optional, for the natural voice: Python 3 with `pip install kokoro-onnx`. The
 app then offers a one-click download of the Kokoro model files (about 340 MB)
 into `tools/kokoro/`; an existing `kokoro-v1.0.onnx` / `voices-v1.0.bin` in
 your home folder is picked up automatically.
+
+Optional, for audio, video and YouTube: nothing to install by hand. The
+library page offers an "Install media tools" button that downloads ffmpeg,
+whisper.cpp with its `base.en` speech model, and yt-dlp (about 298 MB total)
+into `tools/`. Anything already on your PATH is used instead of downloading.
 
 ## Run the packaged app
 
@@ -108,6 +117,9 @@ be overridden on the command line:
 | `app.generation.auto-notes` | true | generate notes right after extraction |
 | `app.generation.language` | English | language of generated material |
 | `app.tts.default-voice` | af_heart | Kokoro voice id |
+| `app.media.whisper-model` | base.en | speech model; `small.en` is slower and better |
+| `app.media.language` | en | transcription language, or `auto` to detect |
+| `app.media.threads` | 0 | whisper threads; 0 means half your cores |
 
 ## Windows note
 

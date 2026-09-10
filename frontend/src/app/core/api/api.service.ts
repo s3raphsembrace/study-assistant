@@ -23,6 +23,10 @@ export interface DocumentSummary {
   updatedAt: string;
   /** Page images are available at /api/documents/{id}/pages/{n}/image. */
   hasImages: boolean;
+  /** Original link, for YouTube sources. */
+  sourceUrl: string | null;
+  /** Playing time, for audio and YouTube sources. */
+  durationSeconds: number | null;
 }
 
 export interface PageView {
@@ -123,6 +127,18 @@ export interface TtsStatus {
   ready: boolean;
 }
 
+export interface MediaStatus {
+  ffmpeg: string | null;
+  ytdlp: string | null;
+  whisper: string | null;
+  model: string | null;
+  modelName: string;
+  transcriptionReady: boolean;
+  youtubeReady: boolean;
+  problem: string | null;
+  downloadMegabytes: number;
+}
+
 export interface AudioInfo {
   voice: string;
   speed: number;
@@ -171,6 +187,22 @@ export class ApiService {
     const form = new FormData();
     for (const f of files) form.append('files', f, f.name);
     return this.http.post<UploadResult[]>('/api/documents', form);
+  }
+
+  /** Add a YouTube lecture by link. */
+  addUrl(url: string): Observable<UploadResult> {
+    return this.http.post<UploadResult>('/api/documents/url', { url });
+  }
+
+  // ---- media tools (ffmpeg, whisper.cpp, yt-dlp) --------------------------
+
+  mediaStatus(): Observable<MediaStatus> {
+    return this.http.get<MediaStatus>('/api/media/status');
+  }
+
+  /** Downloads the transcription tools. Returns the job to follow. */
+  mediaSetup(): Observable<JobView> {
+    return this.http.post<JobView>('/api/media/setup', {});
   }
 
   // ---- generated material -------------------------------------------------
